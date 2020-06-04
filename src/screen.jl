@@ -258,7 +258,7 @@ function display_loading_image(screen::Screen)
         glViewport(0, 0, w, h)
         glClearColor(0, 0, 0, 0)
         glClear(GL_COLOR_BUFFER_BIT)
-        GLAbstraction.render(fb.postprocess[3]) # copy postprocess
+        GLAbstraction.render(fb.postprocess[end]) # copy postprocess
         GLFW.SwapBuffers(nw)
     else
         error("loading_image needs to be Matrix{RGBA{N0f8}} with size(loading_image) == resolution")
