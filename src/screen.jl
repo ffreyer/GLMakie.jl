@@ -37,7 +37,7 @@ mutable struct Screen <: GLScreen
     end
 end
 
-GeometryBasics.widths(x::Screen) = size(x.framebuffer.color)
+GeometryBasics.widths(x::Screen) = size(x.framebuffer)
 
 Base.wait(x::Screen) = isassigned(x.rendertask) && wait(x.rendertask[])
 Base.wait(scene::Scene) = wait(AbstractPlotting.getscreen(scene))
@@ -247,7 +247,7 @@ end
 
 function display_loading_image(screen::Screen)
     fb = screen.framebuffer
-    fbsize = size(fb.color)
+    fbsize = size(fb)
     image = get_loading_image(fbsize)
     if size(image) == fbsize
         nw = to_native(screen)
