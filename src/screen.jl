@@ -252,7 +252,8 @@ function display_loading_image(screen::Screen)
     if size(image) == fbsize
         nw = to_native(screen)
         fb.color[1:size(image, 1), 1:size(image, 2)] = image # transfer loading image to gpu framebuffer
-        ShaderAbstractions.is_context_active(nw) || return
+        window_behavior[] == :new && ShaderAbstractions.switch_context!(nw)
+        ShaderAbstractions.is_context_active(nw) || begin @warn("leaving display_loading_image early"); return end
         w, h = fbsize
         glBindFramebuffer(GL_FRAMEBUFFER, 0) # transfer back to window
         glViewport(0, 0, w, h)
@@ -268,16 +269,24 @@ end
 
 const gl_screens = GLFW.Window[]
 
-function Screen(;
-        resolution = (10, 10), visible = false, title = "Makie",
-        kw_args...
-    )
+function destroy_all!()
+    @warn "destroy_all!"
     if !isempty(gl_screens)
         for elem in gl_screens
             isopen(elem) && destroy!(elem)
         end
         empty!(gl_screens)
     end
+    nothing
+end
+
+function Screen(;
+        resolution = (10, 10), visible = false, title = "Makie",
+        kw_args...
+    )
+    @warn "Screen"
+    window_behavior[] == :singleton && destroy_all!()
+
     # Somehow this constant isn't wrapped by glfw
     GLFW_FOCUS_ON_SHOW = 0x0002000C
     window = GLFW.Window(
@@ -306,8 +315,10 @@ function Screen(;
 
     # tell GLAbstraction that we created a new context.
     # This is important for resource tracking, and only needed for the first context
+    # GG: always switch context
     ShaderAbstractions.switch_context!(window)
-    GLAbstraction.empty_shader_cache!()
+
+    # GLAbstraction.empty_shader_cache!()
     push!(gl_screens, window)
 
     GLFW.SwapInterval(0)
@@ -349,11 +360,28 @@ function global_gl_screen()
     return screen
 end
 
+
+function new_gl_screen(resolution::Tuple, visibility::Bool, tries = 1)
+    screen = Screen()
+    _gl_screen_helper(screen, resolution, visibility, tries)
+    # show loading image on fresh screen
+    display_loading_image(screen)
+    screen
+end
+
+# TODO remove `tries` because probably no one uses it
 function global_gl_screen(resolution::Tuple, visibility::Bool, tries = 1)
     # ugly but easy way to find out if we create new screen.
     # could just be returned by global_gl_screen, but dont want to change the API
     isold = isassigned(GLOBAL_GL_SCREEN) && isopen(GLOBAL_GL_SCREEN[])
     screen = global_gl_screen()
+    _gl_screen_helper(screen, resolution, visibility, tries)
+    # show loading image on fresh screen
+    isold || display_loading_image(screen)
+    screen
+end
+
+function _gl_screen_helper(screen, resolution::Tuple, visibility::Bool, tries = 1)
     GLFW.set_visibility!(to_native(screen), visibility)
     resize!(screen, resolution...)
     new_size = windowsize(to_native(screen))
@@ -365,11 +393,9 @@ function global_gl_screen(resolution::Tuple, visibility::Bool, tries = 1)
         # enlarged to fill screen. WE NEED TO DESTROY!! (I think)
         destroy!(screen)
         # try again
-        return global_gl_screen(resolution, visibility, 2)
+        return _gl_screen_helper(screen, resolution, visibility, 2)
     end
-    # show loading image on fresh screen
-    isold || display_loading_image(screen)
-    screen
+    nothing
 end
 
 function pick_native(screen::Screen, xy::Vec{2, Float64})

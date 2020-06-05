@@ -53,8 +53,16 @@ include("rendering.jl")
 include("events.jl")
 include("drawing_primitives.jl")
 
+const window_behavior = Ref{Symbol}(:singleton)
+
 function AbstractPlotting.backend_display(x::GLBackend, scene::Scene)
-    screen = global_gl_screen(size(scene), AbstractPlotting.use_display[])
+    screen = if window_behavior[] == :singleton
+        global_gl_screen(size(scene), AbstractPlotting.use_display[])
+    elseif window_behavior[] == :new
+        new_gl_screen(size(scene), AbstractPlotting.use_display[])
+    else
+        error("unknown: ", window_behavior[])
+    end
     display_loading_image(screen)
     AbstractPlotting.backend_display(screen, scene)
     return screen

@@ -60,6 +60,8 @@ Renders a single frame of a `window`
 """
 function render_frame(screen::Screen; resize_buffers=true)
     nw = to_native(screen)
+    # force context switch. TODO beware multithreading? Use locks?
+    window_behavior[] == :new && ShaderAbstractions.switch_context!(nw)
     ShaderAbstractions.is_context_active(nw) || return
     fb = screen.framebuffer
     if resize_buffers
