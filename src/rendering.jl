@@ -54,15 +54,25 @@ function setup!(screen)
 end
 
 const selection_queries = Function[]
+const debug_render_frame = Dict{Any, Any}()
 
 """
 Renders a single frame of a `window`
 """
 function render_frame(screen::Screen; resize_buffers=true)
+    if !haskey(debug_render_frame, screen)
+        debug_render_frame[screen] = Dict(:enter=>0, :active=>0)
+    end
+    debug_render_frame[screen][:enter] += 1
     nw = to_native(screen)
     # force context switch. TODO beware multithreading? Use locks?
     window_behavior[] == :new && ShaderAbstractions.switch_context!(nw)
     ShaderAbstractions.is_context_active(nw) || return
+    debug_render_frame[screen][:active] += 1
+    dbt = debug_render_frame[screen][:active] # debug time
+    dbt01_1 = Float32((dbt % 30) / 30)
+    dbt01_2 = Float32((dbt % 60) / 60)
+    dbt01_3 = Float32((dbt % 90) / 90)
     fb = screen.framebuffer
     if resize_buffers
         wh = Int.(framebuffer_size(nw))
@@ -141,7 +151,7 @@ function render_frame(screen::Screen; resize_buffers=true)
     glDrawBuffer(GL_COLOR_ATTACHMENT0)  # color_luma buffer
     glViewport(0, 0, w, h)
     # necessary with negative SSAO bias...
-    glClearColor(1, 1, 1, 1)
+    glClearColor(1, dbt01_2, dbt01_1, 1)
     glClear(GL_COLOR_BUFFER_BIT)
     GLAbstraction.render(fb.postprocess[3])
 
